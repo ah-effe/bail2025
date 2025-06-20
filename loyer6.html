@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Que vaut mon bail? (2025)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body   { font-family: sans-serif; margin: 0 auto; padding: 1rem; max-width: 720px; }
+    h2     { margin-top: 2rem; }
+    label  { display: block; margin-top: 1rem; }
+    input  { width: 100%; padding: .45rem; }
+    button { margin-top: 1rem; padding: .5rem 1rem; }
+
+    .section     { margin-top: 2rem; }
+    .résultat    { margin-top: 1rem; padding: 1rem; border: 1px solid #ccc; }
+    .raffiné     { margin-top: 1rem; padding: 1rem; border: 1px solid #ccc; }
+    .bloc-détail { background: #f9f9f9; padding: .6rem; white-space: pre-wrap; }
+
+    .montant { color: #e60000; font-weight: 700; }
+  </style>
+<style>
+.hover-info {
+  position: relative;
+  font-weight: bold;
+  color: #009688;
+  float: right;
+  cursor: help;
+}
+
+.hover-info .tooltip {
+  visibility: hidden;
+  opacity: 0;
+  background: #333;
+  color: #fff;
+  font-size: 0.9rem;
+  padding: .4em .6em;
+  border-radius: 4px;
+  position: absolute;
+  top: -2.2em;
+  right: 0;
+  white-space: normal;
+  z-index: 10;
+  transition: opacity 0.2s ease-in-out;
+  width: max-content;
+  max-width: 250px;
+}
+
+.hover-info:hover .tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+</style>
+</head>
+<body>
+
+<h1>Comparateur de bail</h1>
+
+<!-- SECTION 1 – Informations -->
+<div class="section">
+  <h2>Informations</h2>
+  <label>Loyer actuel ($/mois)
+    <input type="number" id="loyerActuel" required>
+  </label>
+  <label>Loyer d’un appartement comparable ($/mois) <span class="hover-info">[?]
+  <span class="tooltip">Choisissez un appartement de même taille, dans le même quartier.</span>
+</span>
+    <input type="number" id="loyerMarche" required>
+  </label>
+  <label>Nombre d’années prévues <span class="hover-info">[?]
+  <span class="tooltip">Un calcul sera fait en fonction du taux d'augmentation recommandé par le TAL.</span>
+</span>
+    <input type="number" id="annees" min="1" required>
+  </label>
+  <button onclick="calculer()">Calculer</button>
+</div>
+
+<!-- SECTION 2 – Résultat -->
+<div class="section">
+  <h2>Résultat</h2>
+  <div class="résultat" id="résultatBase">
+    Veuillez remplir les informations ci-dessus.
+  </div>
+<br>
+  <!-- Détail base (menu déroulant) -->
+  <details id="detailBaseWrapper" style="display:none;"><br>
+    <summary>Détail du calcul</summary>
+    <div id="detailBase" class="bloc-détail"></div>
+  </details>
+</div>
+
+<!-- SECTION 3 – Raffiner -->
+<div class="section">
+  <h2>Raffiner le calcul</h2>
+  <label>Nombre de mois du bail actuel déjà payés <span class="hover-info">[?]
+  <span class="tooltip">Cela vous permettra d'ajuster en fonction de l'année en cours</span>
+</span>
+    <input type="number" id="moisPassés" min="0" max="11" value="0">
+  </label>
+  <label>Taux d'augmentation personnalisé (%)<span class="hover-info">[?]
+  <span class="tooltip">Si vous voulez utiliser un autre taux d'augmentation que celui du TAL en 2025.</span>
+</span>
+    <input type="number" id="taux" step="0.01" value="5.9">
+  </label>
+  <button onclick="raffiner()">Calculer un résultat raffiné</button>
+
+  <div class="raffiné" id="résultatRaffiné"></div>
+<br>
+  <!-- Détail raffiné (menu déroulant, masqué tant qu'on ne calcule pas) -->
+  <details id="detailRaffinéWrapper" style="display:none;"><br>
+    <summary>Détail du calcul (raffiné)</summary>
+    <div id="detailRaffiné" class="bloc-détail"></div>
+  </details>
+</div>
+
+<script>
+/* ---------- Helpers ---------- */
+const fmt = n => n.toLocaleString('fr-CA', {
+  style: 'currency',
+  currency: 'CAD',
+  maximumFractionDigits: 0
+});
+const plural = (n,sing,plu) => n === 1 ? sing : plu;
+
+/* ---------- Variables globales ---------- */
+let Rc, Rm, n, delta0;   // stockées pour réutilisation
+
+/* ---------- Calcul de base ---------- */
+function calculer() {
+  Rc = +document.getElementById('loyerActuel').value;
+  Rm = +document.getElementById('loyerMarche').value;
+  n  = +document.getElementById('annees').value;
+
+  if (!Rc || !Rm || !n) {
+    document.getElementById('résultatBase').textContent =
+      'Veuillez remplir tous les champs.';
+    return;
+  }
+
+  delta0 = Rm - Rc;
+  const tauxBase = 0.059;
+  const A1       = 12 * delta0;
+
+  let cumul = 0;
+  let lignes = [];
+  for (let i = 0; i < n; i++) {
+    const Ak = A1 * Math.pow(1 + tauxBase, i);
+    cumul += Ak;
+    lignes.push(`Année ${i + 1} : ${fmt(Ak)}`);
+  }
+
+  const phrase = `Si vous quittez votre logement aujourd'hui plutôt que dans ` +
+                 `${n} ${plural(n,'année','années')}, cela représente environ ` +
+                 `<span class="montant">${fmt(cumul)} de perte</span> par rapport à votre loyer actuel.<br><br> ` +
+                 `C'est le montant <strong>minimum</strong> que vous devriez demander pour rompre votre bail.`;
+
+  document.getElementById('résultatBase').innerHTML = phrase;
+
+  lignes.push(`Total : ${fmt(cumul)}`);
+  document.getElementById('detailBase').textContent = lignes.join('\n');
+  document.getElementById('detailBaseWrapper').style.display = 'block';
+
+  // reset raffiné
+  document.getElementById('résultatRaffiné').textContent = '';
+  document.getElementById('detailRaffinéWrapper').style.display = 'none';
+  document.getElementById('detailRaffiné').textContent = '';
+}
+
+/* ---------- Calcul raffiné ---------- */
+function raffiner() {
+  if (!delta0 || !n) {
+    document.getElementById('résultatRaffiné').textContent =
+      'Veuillez d’abord effectuer le calcul de base.';
+    return;
+  }
+
+  const m0   = +document.getElementById('moisPassés').value;
+  const taux = +document.getElementById('taux').value / 100;
+
+  const A1 = 12 * delta0;
+
+  let cumul = 0;
+  let lignes = [];
+  for (let i = 0; i < n; i++) {
+    const Ak = A1 * Math.pow(1 + taux, i);
+    cumul += Ak;
+    lignes.push(`Année ${i + 1} : ${fmt(Ak)}`);
+  }
+
+  const réduction = delta0 * m0;
+  const ajusté = cumul - réduction;
+
+  const phraseR = `Résultat raffiné : <span class="montant">${fmt(ajusté)} de plus</span>`;
+  document.getElementById('résultatRaffiné').innerHTML = phraseR;
+
+  lignes.push(`Total avant ajustement : ${fmt(cumul)}`);
+  lignes.push(`Réduction pour ${m0} mois déjà passés : -${fmt(réduction)}`);
+  lignes.push(`Total ajusté : ${fmt(ajusté)}`);
+
+  document.getElementById('detailRaffiné').textContent = lignes.join('\n');
+  document.getElementById('detailRaffinéWrapper').style.display = 'block';
+}
+</script>
+<footer style="margin-top: 4rem; font-size: 0.85rem; color: #666; text-align: center; border-top: 1px solid #ccc; padding-top: 1rem;">
+  <p>
+    Ce travail est distribué sous la licence 
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.fr" target="_blank" style="color: #009688; text-decoration: none;">
+      Creative Commons BY-NC-SA 4.0</a>, par Arthur F en juin 2025.</p>
+ <p style="font-size: 0.75rem; font-style: italic; margin-bottom: 1rem;">
+    Ce calculateur est fourni à titre informatif uniquement. Il ne constitue pas un avis juridique ni financier.
+    L’auteur·e ne peut être tenu·e responsable de l’usage qui en est fait.
+  </p>
+</footer>
+</body>
+</html>
