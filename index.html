@@ -189,7 +189,7 @@ function raffiner() {
   const réduction = delta0 * m0;
   const ajusté = cumul - réduction;
 
-  const phraseR = `Résultat raffiné : <span class="montant">${fmt(ajusté)} de plus</span>`;
+  const phraseR = `Résultat raffiné : <span class="montant">${fmt(ajusté)} de perte</span>`;
   document.getElementById('résultatRaffiné').innerHTML = phraseR;
 
   lignes.push(`Total avant ajustement : ${fmt(cumul)}`);
